@@ -7,9 +7,10 @@ from pymongo import MongoClient
 # 1. Page Config
 st.set_page_config(page_title="Adviser | Profile", layout="centered", initial_sidebar_state="collapsed")
 
-# 2. CSS for Circular Profile Image
+# 2. CSS Configuration
 st.markdown("""
 <style>
+    [data-testid="stSidebarNav"] {display: none !important;}
     .profile-container {
         display: flex;
         flex-direction: column;
@@ -79,17 +80,6 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
-
-st.markdown(
-    """
-    <style>
-        [data-testid="stSidebarNav"] {display: none !important;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
 # 3. SIDEBAR
 with st.sidebar:
     st.title("🎓 Menu")
@@ -104,7 +94,7 @@ with st.sidebar:
     if st.button("🗺️ Roadmap", use_container_width=True):
         st.switch_page("pages/4_Roadmap.py")
     if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
+        st.session_state.clear()
         st.switch_page("app.py")
 
 # --- PROFILE DETAILS SECTION ---
@@ -125,61 +115,23 @@ else:
         new_name = st.text_input("Full Name", value=user_data.get("full_name", ""))
         
         dept_options = [
-    "Accounting",
-    "Agricultural and Bio-Resources",
-    "Agricultural Economics and Extension",
-    "Agricultural Education",
-    "Animal and Environmental Biology",
-    "Animal Production and Health",
-    "Banking and Finance",
-    "Biochemistry",
-    "Biology Education",
-    "Business Administration",
-    "Business Education",
-    "Chemistry Education",
-    "Civil Engineering",
-    "Computer Engineering",
-    "Computer Sciences",
-    "Criminology and Security Studies",
-    "Crop Science and Horticulture",
-    "Demography and Social Statistics",
-    "Economics and Development Studies",
-    "Educational Foundation",
-    "Educational Management",
-    "Electrical and Electronics Engineering",
-    "English and Literary Studies",
-    "English Education",
-    "Fishery and Aquaculture",
-    "Food Science and Technology",
-    "General Studies",
-    "Geology",
-    "Geophysics",
-    "History and International Relations",
-    "Hospitality and Tourism Management",
-    "Industrial Chemistry",
-    "Library and Information Science",
-    "Linguistics and languages",
-    "Mass Communication",
-    "Mathematics",
-    "Mathematics Education",
-    "Mechanical Engineering",
-    "Mechatronics Engineering",
-    "Metallurgical and Materials Engineering",
-    "Microbiology",
-    "Peace and Conflict Resolution",
-    "Physics",
-    "Plant Science and Biotechnology",
-    "Political Science",
-    "Psychology",
-    "Public Administration",
-    "Sociology",
-    "Soil Science",
-    "Theater and Media Arts",
-    "Water Resources Management and Agrometrology",
-    "Software Engineering",
-    "Cybersecurity",
-    "Information Technology"
-]
+            "Accounting", "Agricultural and Bio-Resources", "Agricultural Economics and Extension",
+            "Agricultural Education", "Animal and Environmental Biology", "Animal Production and Health",
+            "Banking and Finance", "Biochemistry", "Biology Education", "Business Administration",
+            "Business Education", "Chemistry Education", "Civil Engineering", "Computer Engineering",
+            "Computer Sciences", "Criminology and Security Studies", "Crop Science and Horticulture",
+            "Demography and Social Statistics", "Economics and Development Studies", "Educational Foundation",
+            "Educational Management", "Electrical and Electronics Engineering", "English and Literary Studies",
+            "English Education", "Fishery and Aquaculture", "Food Science and Technology", "General Studies",
+            "Geology", "Geophysics", "History and International Relations", "Hospitality and Tourism Management",
+            "Industrial Chemistry", "Library and Information Science", "Linguistics and languages",
+            "Mass Communication", "Mathematics", "Mathematics Education", "Mechanical Engineering",
+            "Mechatronics Engineering", "Metallurgical and Materials Engineering", "Microbiology",
+            "Peace and Conflict Resolution", "Physics", "Plant Science and Biotechnology", "Political Science",
+            "Psychology", "Public Administration", "Sociology", "Soil Science", "Theater and Media Arts",
+            "Water Resources Management and Agrometrology", "Software Engineering", "Cybersecurity",
+            "Information Technology"
+        ]
         curr_dept = user_data.get("department", "")
         dept_idx = dept_options.index(curr_dept) if curr_dept in dept_options else 0
         new_dept = st.selectbox("Department", options=dept_options, index=dept_idx)
@@ -198,7 +150,8 @@ else:
                     "full_name": new_name,
                     "department": new_dept,
                     "level": new_lvl,
-                    "cgpa": new_cgpa
+                    "cgpa": new_cgpa,
+                    "profile_setup_complete": True  # <--- THIS IS THE MISSING TRIGGER
                 }}
             )
             st.session_state.edit_mode = False

@@ -41,3 +41,5 @@ Thumbs.db
 # --- Temporary Files ---
 temp_*.pdf
 *.log
+
+test_doc

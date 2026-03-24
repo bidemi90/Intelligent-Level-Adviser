@@ -8,7 +8,7 @@ from pymongo import MongoClient
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_cohere import CohereEmbeddings
 
 # Layout configuration
 st.set_page_config(page_title="Adviser | Documents", layout="centered", initial_sidebar_state="collapsed")
@@ -51,7 +51,7 @@ with st.sidebar:
     if st.button("🗺️ Roadmap", use_container_width=True):
         st.switch_page("pages/4_Roadmap.py")
     if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
+        st.session_state.clear()
         st.switch_page("app.py")
 
 st.title("📁 Document Management")
@@ -61,7 +61,7 @@ with st.expander("➕ Upload New Handbook (PDF)", expanded=True):
     if st.button("Upload & Index Document", type="primary"):
         if uploaded_file:
             doc_id = str(uuid.uuid4())[:8]
-            temp_file_path = f"temp_{doc_id}.pdf" # Define path here for accessibility
+            temp_file_path = f"temp_{doc_id}.pdf"
             
             try:
                 with st.spinner("Uploading to cloud..."):
@@ -76,8 +76,8 @@ with st.expander("➕ Upload New Handbook (PDF)", expanded=True):
                     data = loader.load()
                     
                     text_splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=1500, 
-                        chunk_overlap=300,
+                        chunk_size=1000, 
+                        chunk_overlap=200,
                         separators=["\n\n", "\n", ". ", " ", ""]
                     )
                     chunks = text_splitter.split_documents(data)
@@ -85,11 +85,10 @@ with st.expander("➕ Upload New Handbook (PDF)", expanded=True):
                     for chunk in chunks:
                         chunk.metadata.update({"userid": user_id, "doc_id": doc_id})
                     
-                    model = GoogleGenerativeAIEmbeddings(
-                        model="models/gemini-embedding-001",
-                        task_type="retrieval_document",
-                        output_dimensionality=768,
-                        google_api_key=os.getenv("GOOGLE_API_KEY")
+                    # --- COHERE API INTEGRATION ---
+                    model = CohereEmbeddings(
+                        model="embed-english-v3.0",
+                        cohere_api_key=os.getenv("COHERE_API_KEY")
                     )
                     
                     MongoDBAtlasVectorSearch.from_documents(

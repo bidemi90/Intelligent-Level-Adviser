@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from pymongo import MongoClient
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_cohere import CohereEmbeddings, ChatCohere
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
@@ -59,7 +59,7 @@ with st.sidebar:
     if st.button("🗺️ Roadmap", use_container_width=True):
         st.switch_page("pages/4_Roadmap.py")
     if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
+        st.session_state.clear()
         st.switch_page("app.py")
 
 st.title("🗺️ Academic Roadmap & Strategy")
@@ -94,12 +94,19 @@ st.divider()
 if st.button("Generate My Academic Strategy", type="primary", use_container_width=True):
     with st.spinner("Analyzing curriculum and calculating strategy based on your CGPA..."):
         try:
-            # Setup Retriever
-            model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", output_dimensionality=768)
+            # --- COHERE API INTEGRATION ---
+            model = CohereEmbeddings(
+                model="embed-english-v3.0",
+                cohere_api_key=os.getenv("COHERE_API_KEY")
+            )
             vector_store = MongoDBAtlasVectorSearch(embeddings_coll, model, index_name="vector_index")
-            retriever = vector_store.as_retriever(search_kwargs={"pre_filter": {"userid": user_id}, "k": 12})
+            retriever = vector_store.as_retriever(search_kwargs={"pre_filter": {"userid": user_id}, "k": 20})
             
-            llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.1)
+            llm = ChatCohere(
+                model="command-r-08-2024", 
+                temperature=0.1,
+                cohere_api_key=os.getenv("COHERE_API_KEY")
+            )
             
             # Formatting Context Helper
             def format_docs(docs):
@@ -158,4 +165,4 @@ if st.button("Generate My Academic Strategy", type="primary", use_container_widt
                 
         except Exception as e:
             st.error(f"Generation Error: {str(e)}")
-            st.info("Note: If you receive a RESOURCE_EXHAUSTED error, your Free API quota is used up for the minute.")
+            st.info("Note: Verify Cohere API key limits or network connectivity.")

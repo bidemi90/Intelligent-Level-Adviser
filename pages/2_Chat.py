@@ -1,8 +1,9 @@
 import streamlit as st
 import os
+import time
 from pymongo import MongoClient
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_cohere import CohereEmbeddings, ChatCohere
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -32,13 +33,15 @@ client = MongoClient(os.getenv("MONGO_URI"))
 db = client["LevelAdviser"]
 embeddings_coll = db["embeddings"]
 vault_coll = db["vault"]
-history_coll = db["chat_history"] # NEW COLLECTION FOR PERSISTENCE
+history_coll = db["chat_history"]
 
-# 3. LOAD HISTORY FROM MONGODB (The "LocalStorage" equivalent)
+# 3. LOAD HISTORY FROM MONGODB
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    # Fetch last 20 messages for this specific user from Atlas
-    saved_messages = list(history_coll.find({"userid": user_id}).sort("timestamp", 1).limit(20))
+    # Fetch latest 20 messages (descending)
+    saved_messages = list(history_coll.find({"userid": user_id}).sort("timestamp", -1).limit(20))
+    # Reverse list for chronological UI rendering
+    saved_messages.reverse()
     for msg in saved_messages:
         st.session_state.messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -52,7 +55,7 @@ with st.sidebar:
     if st.button("👤 Profile", use_container_width=True): st.switch_page("pages/3_Profile.py")
     if st.button("🗺️ Roadmap", use_container_width=True): st.switch_page("pages/4_Roadmap.py")
     if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
+        st.session_state.clear()
         st.switch_page("app.py")
 
 st.title("🤖 Intelligent Level Adviser")
@@ -73,7 +76,7 @@ else:
     if prompt:
         # Save User Message to Session and MongoDB
         st.session_state.messages.append({"role": "user", "content": prompt})
-        history_coll.insert_one({"userid": user_id, "role": "user", "content": prompt, "timestamp": os.times()[4]})
+        history_coll.insert_one({"userid": user_id, "role": "user", "content": prompt, "timestamp": time.time()})
         
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -81,23 +84,42 @@ else:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    model = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", output_dimensionality=768)
-                    vector_store = MongoDBAtlasVectorSearch(embeddings_coll, model, index_name="vector_index")
-                    retriever = vector_store.as_retriever(search_kwargs={"pre_filter": {"userid": user_id}, "k": 10})
+                    # --- COHERE API INTEGRATION ---
+                    model = CohereEmbeddings(
+                        model="embed-english-v3.0",
+                        cohere_api_key=os.getenv("COHERE_API_KEY")
+                    )
                     
-                    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+                    vector_store = MongoDBAtlasVectorSearch(embeddings_coll, model, index_name="vector_index")
+                    retriever = vector_store.as_retriever(search_kwargs={"pre_filter": {"userid": user_id}, "k": 20})
+                    
+                    llm = ChatCohere(
+                        model="command-r-08-2024", 
+                        temperature=0.1,
+                        cohere_api_key=os.getenv("COHERE_API_KEY")
+                    )
 
-                    # --- CONTEXTUAL PROMPT (The "Memory" Part) ---
-                    # We add a MessagesPlaceholder to hold previous chat history
+                    # --- CONTEXTUAL PROMPT ---
+                    system_prompt_text = """You are an official Academic Adviser. Your sole objective is to answer student queries using ONLY the provided document context.
+
+Context:
+{context}
+
+Strict Operational Rules:
+1. Grounding: You must extract your answer exclusively from the provided Context. 
+2. No Hallucination: Do NOT use external knowledge, internet sources, or pre-trained data to answer questions about courses, prerequisites, or university policies.
+3. Fallback Protocol: If the specific answer cannot be found in the Context, you must state exactly: "I cannot find this information in the currently uploaded handbook." Do not attempt to guess or synthesize an answer.
+4. Tone: Maintain a professional, academic, and direct tone."""
+
                     contextual_prompt = ChatPromptTemplate.from_messages([
-                        ("system", "You are an Academic Adviser. Use the chat history and context to answer: {context}"),
+                        ("system", system_prompt_text),
                         MessagesPlaceholder(variable_name="chat_history"),
                         ("human", "{input}"),
                     ])
-
-                    # Prepare History for the AI (Convert session strings to Message Objects)
+                    
+                    # Prepare History for the AI
                     chat_history_objs = []
-                    for m in st.session_state.messages[-6:]: # Pass only last 6 messages for efficiency
+                    for m in st.session_state.messages[-6:]: 
                         if m["role"] == "user": chat_history_objs.append(HumanMessage(content=m["content"]))
                         else: chat_history_objs.append(AIMessage(content=m["content"]))
 
@@ -109,9 +131,7 @@ else:
 
                     # Save AI Message to Session and MongoDB
                     st.session_state.messages.append({"role": "assistant", "content": ans})
-                    history_coll.insert_one({"userid": user_id, "role": "assistant", "content": ans, "timestamp": os.times()[4]})
+                    history_coll.insert_one({"userid": user_id, "role": "assistant", "content": ans, "timestamp": time.time()})
                     
-                    st.rerun()
-                
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
