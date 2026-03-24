@@ -59,7 +59,7 @@ pip install tf-keras  # Required for Keras 2/3 compatibility in Transformers
 Create a `.env` file in the root directory:
 ```env
 MONGO_URI=your_mongodb_atlas_connection_string
-GOOGLE_API_KEY=your_gemini_api_key
+COHERE_API_KEY=your_gemini_api_key
 CLOUDINARY_CLOUD_NAME=your_name
 CLOUDINARY_API_KEY=your_key
 CLOUDINARY_API_SECRET=your_secret
